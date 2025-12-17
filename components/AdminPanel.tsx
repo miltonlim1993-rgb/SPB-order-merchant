@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Settings, X, Plus, ChevronUp, ChevronDown, Edit2, Trash2, ArrowLeft, Check, Copy, GripVertical, Image as ImageIcon, MapPin, Layers, ArrowUp, ArrowDown, Save, Globe, Clock, Beef, LayoutList, Link, Calendar, Eye, ExternalLink, Zap, Lock, Database, Download, Upload, FileText, FileJson, AlertTriangle, Info, Grid } from 'lucide-react';
 import { AppConfig, MenuItem, Outlet, OptionGroup, MenuItemOption, Category, AdPoster } from '../types';
+import { saveAppState } from '../services/persistence';
 
 interface AdminPanelProps {
   isOpen: boolean;
@@ -406,7 +407,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose, config, setCon
               if (json.config && json.menuItems && json.outlets) {
                   setConfirmModal({
                       message: `Restore system from backup dated ${json.timestamp || 'Unknown'}? This will overwrite current data.`,
-                      action: () => {
+                      action: async () => {
+                          await saveAppState({ config: json.config, menuItems: json.menuItems, outlets: json.outlets });
                           setConfig(json.config);
                           setMenuItems(json.menuItems);
                           setOutlets(json.outlets);

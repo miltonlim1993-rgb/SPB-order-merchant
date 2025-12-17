@@ -6,12 +6,15 @@ import { MenuItem, CartItem, MenuItemOption, AppConfig, Outlet, FlowGroup, AdPos
 import AdminPanel from './components/AdminPanel';
 import FlowModal from './components/FlowModal';
 import CartDrawer from './components/CartDrawer';
+import { loadAppState, saveAppState, subscribeAppState } from './services/persistence';
 
 const App: React.FC = () => {
   // --- GLOBAL APP STATE ---
   const [config, setConfig] = useState<AppConfig>(DEFAULT_CONFIG);
   const [outlets, setOutlets] = useState<Outlet[]>(DEFAULT_OUTLETS);
   const [menuItems, setMenuItems] = useState<MenuItem[]>(MENU_ITEMS);
+  const [loaded, setLoaded] = useState(false);
+  const isApplyingRemote = useRef(false);
   
   // --- USER SESSION STATE ---
   const [selectedOutletId, setSelectedOutletId] = useState<string | null>(null);
@@ -146,6 +149,38 @@ const App: React.FC = () => {
   useEffect(() => {
     setSortedOutlets(outlets);
   }, [outlets]);
+  useEffect(() => {
+    const init = async () => {
+      const state = await loadAppState();
+      if (state) {
+        setConfig(state.config);
+        setMenuItems(state.menuItems);
+        setOutlets(state.outlets);
+      }
+      setLoaded(true);
+    };
+    init();
+  }, []);
+  useEffect(() => {
+    if (!loaded) return;
+    const t = setTimeout(() => {
+      if (isApplyingRemote.current) return;
+      saveAppState({ config, menuItems, outlets });
+    }, 500);
+    return () => clearTimeout(t);
+  }, [config, menuItems, outlets, loaded]);
+  useEffect(() => {
+    const unsubscribe = subscribeAppState((state) => {
+      isApplyingRemote.current = true;
+      setConfig(state.config);
+      setMenuItems(state.menuItems);
+      setOutlets(state.outlets);
+      setTimeout(() => {
+        isApplyingRemote.current = false;
+      }, 0);
+    });
+    return () => unsubscribe();
+  }, []);
 
   // HANDLE SHARE LINK (DEEP LINKING)
   useEffect(() => {
