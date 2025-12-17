@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generate SQL from Backup</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        textarea { width: 100%; height: 400px; margin-top: 10px; }
+        .step { margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Supabase Data Import Generator</h1>
+    
+    <div class="step">
+        <h3>Step 1: Select your backup file</h3>
+        <p>Select the <code>Stupiak_System_Backup_2025-12-16.json</code> file.</p>
+        <input type="file" id="fileInput" accept=".json">
+    </div>
+
+    <div class="step">
+        <h3>Step 2: Copy the SQL</h3>
+        <p>Copy the generated SQL below and run it in your Supabase SQL Editor.</p>
+        <textarea id="output" placeholder="SQL will appear here..."></textarea>
+    </div>
+
+    <script>
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+            let sql = '-- Generated Data Import Script\n\n';
+    
+            // 1. Config: Categories
+            if (data.config && data.config.categories) {
+                sql += '-- Categories\n';
+                data.config.categories.forEach(c => {
+                    sql += `INSERT INTO categories (name) VALUES ('${c.name.replace(/'/g, "''")}') ON CONFLICT (name) DO NOTHING;\n`;
+                });
+                sql += '\n';
+            }
+
+            // 2. Config: Meat Categories
+            if (data.config && data.config.meatCategories) {
+                sql += '-- Meat Categories\n';
+                data.config.meatCategories.forEach(mc => {
+                    sql += `INSERT INTO meat_categories (name, tag_color) VALUES ('${mc.name.replace(/'/g, "''")}', '${mc.tagColor || ''}') ON CONFLICT (name) DO NOTHING;\n`;
+                });
+                sql += '\n';
+            }
+            
+            // 3. Option Groups & Options
+            if (data.config && data.config.optionGroups) {
+                sql += '-- Option Groups and Options\n';
+                data.config.optionGroups.forEach(og => {
+                    sql += `INSERT INTO option_groups (id, name, max_selection, is_required, display_mode, is_customization) VALUES ('${og.id}', '${og.name.replace(/'/g, "''")}', ${og.maxSelection}, ${og.isRequired}, '${og.displayMode}', ${og.isCustomization || false}) ON CONFLICT (id) DO NOTHING;\n`;
+                    
+                    if (og.options) {
+                        og.options.forEach(opt => {
+                            sql += `INSERT INTO options (option_group_id, name, price, type, is_combo_trigger) VALUES ('${og.id}', '${opt.name.replace(/'/g, "''")}', ${opt.price}, '${opt.type}', ${opt.isComboTrigger || false});\n`;
+                        });
+                    }
+                });
+                sql += '\n';
+            }
+    
+            // 4. Menu Items
+            if (data.menuItems) {
+                sql += '-- Menu Items\n';
+                data.menuItems.forEach(item => {
+                    const desc = item.description ? item.description.replace(/'/g, "''") : '';
+                    const img = item.imageUrl || '';
+                    const meat = item.meatType || '';
+                    const schedule = item.availabilitySchedule || '';
+                    
+                    sql += `INSERT INTO menu_items (id, name, price, category_name, description, image_url, is_hidden, meat_type, availability_schedule) VALUES ('${item.id}', '${item.name.replace(/'/g, "''")}', ${item.price}, '${item.category.replace(/'/g, "''")}', '${desc}', '${img}', ${item.isHidden}, '${meat}', '${schedule}') ON CONFLICT (id) DO NOTHING;\n`;
+                    
+                    if (item.linkedOptionGroupIds) {
+                        item.linkedOptionGroupIds.forEach(ogId => {
+                            sql += `INSERT INTO menu_item_option_groups (menu_item_id, option_group_id) VALUES ('${item.id}', '${ogId}') ON CONFLICT DO NOTHING;\n`;
+                        });
+                    }
+                });
+                sql += '\n';
+            }
+
+            // 5. Outlets
+            if (data.outlets) {
+                sql += '-- Outlets\n';
+                data.outlets.forEach(o => {
+                    sql += `INSERT INTO outlets (id, name, address, phone, whatsapp_number, is_active, opening_time, closing_time, lat, lng) VALUES ('${o.id}', '${o.name.replace(/'/g, "''")}', '${o.address.replace(/'/g, "''")}', '${o.phone}', '${o.whatsappNumber}', ${o.isActive}, '${o.openingTime}', '${o.closingTime}', ${o.lat}, ${o.lng}) ON CONFLICT (id) DO NOTHING;\n`;
+                });
+            }
+    
+            document.getElementById('output').value = sql;
+        } catch (err) {
+            alert('Error parsing JSON: ' + err.message);
+        }
+      };
+      reader.readAsText(file);
+    });
+    </script>
+</body>
+</html>
